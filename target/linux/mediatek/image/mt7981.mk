@@ -530,20 +530,27 @@ define Device/jcg_q30
 endef
 TARGET_DEVICES += jcg_q30
 
+define Device/jcg_q30-pro
+  DEVICE_VENDOR := JCG
+  DEVICE_MODEL := Q30 PRO
+  DEVICE_DTS := mt7981-jcg-q30-pro
+  DEVICE_DTS_DIR := $(DTS_DIR)/mediatek
+  SUPPORTED_DEVICES := jcg,q30-pro
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 114816k
+  KERNEL_IN_UBI := 1
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += jcg_q30-pro
+
 define Device/ikuai_q3000
   DEVICE_VENDOR := iKuai
   DEVICE_MODEL := Q3000
   DEVICE_DTS := mt7981-ikuai-q3000
   DEVICE_DTS_DIR := $(DTS_DIR)/mediatek
   SUPPORTED_DEVICES := ikuai,q3000
-  UBINIZE_OPTS := -E 5
-  BLOCKSIZE := 128k
-  PAGESIZE := 2048
-  IMAGE_SIZE := 114816k
-  KERNEL_IN_UBI := 1
-  IMAGES += factory.bin
-  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
-  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
 TARGET_DEVICES += ikuai_q3000
 
