@@ -814,3 +814,20 @@ define Device/Airpi-emmc-manper
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
 TARGET_DEVICES += Airpi-emmc-manper
+
+define Device/zn_m5
+  DEVICE_VENDOR := SUPERELECTRON
+  DEVICE_MODEL := ZN-M5
+  DEVICE_DTS := mt7981-zn-m5
+  DEVICE_DTS_DIR := $(DTS_DIR)/mediatek
+  SUPPORTED_DEVICES := zn,m5
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 114688k
+  KERNEL_IN_UBI := 1
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += zn_m5
