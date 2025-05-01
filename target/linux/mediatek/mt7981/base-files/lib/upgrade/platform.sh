@@ -206,6 +206,7 @@ platform_do_upgrade() {
 	jcg,q30-pro |\
 	nradio,wt9103 |\
 	cmcc,a10 |\
+	zn,m5 |\
 	cmcc,rax3000m |\
 	cmcc,xr30 |\
 	h3c,nx30pro |\
@@ -262,6 +263,7 @@ platform_check_image() {
 	jcg,q30 |\
 	jcg,q30-pro |\
 	cmcc,a10 |\
+	zn,m5 |\
 	cmcc,rax3000m* |\
 	cmcc,xr30* |\
 	h3c,nx30pro |\
