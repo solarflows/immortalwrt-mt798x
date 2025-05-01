@@ -21,10 +21,11 @@
  
  MODULE_LICENSE("GPL");
  MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
-@@ -273,6 +275,25 @@
+@@ -273,6 +275,42 @@
  	return true;
  }
  
++#if defined(CONFIG_MEDIATEK_NETSYS_RX_V2)
 +static struct hnat_desc {
 +	u32 entry : 15;
 +	u32 filled : 3;
@@ -41,27 +42,42 @@
 +	u32 resv5 : 20;
 +	u32 magic_tag_protect : 16;
 +} __packed;
++#else
++static struct hnat_desc {
++	u32 entry : 14;
++	u32 crsn : 5;
++	u32 sport : 4;
++	u32 alg : 1;
++	u32 iface : 8;
++	u32 ppe : 1;
++	u32 filled : 3;
++	u32 magic_tag_protect : 16;
++	u32 wdmaid : 8;
++	u32 rxid : 2;
++	u32 wcid : 10;
++	u32 bssid : 6;
++} __packed;
++#endif
 +#define HIT_BIND_KEEPALIVE_DUP_OLD_HDR 0x15
 +#define skb_hnat_reason(skb) (((struct hnat_desc *)(skb->head))->crsn)
 +
  /* Returns one of the generic firewall policies, like NF_ACCEPT. */
  unsigned int
  ipt_do_table(struct sk_buff *skb,
-@@ -291,7 +312,12 @@
+@@ -291,7 +331,12 @@
  	const struct xt_table_info *private;
  	struct xt_action_param acpar;
  	unsigned int addend;
--
-+	
+
 +	struct nf_conn *ct;
 +	struct nf_conn_acct *acct;
 +	struct nf_conn_counter *conn_counter;
 +	enum ip_conntrack_info ctinfo;
-+	
++
  	/* Initialization */
  	WARN_ON(!(table->valid_hooks & (1 << hook)));
  	local_bh_disable();
-@@ -302,9 +328,22 @@
+@@ -302,9 +347,22 @@
  	e = get_entry(table_base, private->hook_entry[hook]);
  	if (ipt_handle_default_rule(e, &verdict)) {
  		struct xt_counters *counter;
@@ -85,7 +101,7 @@
  		local_bh_enable();
  		return verdict;
  	}
-@@ -360,6 +399,17 @@
+@@ -360,6 +418,17 @@
  
  		counter = xt_get_this_cpu_counter(&e->counters);
  		ADD_COUNTER(*counter, skb->len, 1);
@@ -115,10 +131,11 @@
  
  MODULE_LICENSE("GPL");
  MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
-@@ -245,6 +247,25 @@
+@@ -245,6 +247,42 @@
  	return (void *)entry + entry->next_offset;
  }
  
++#if defined(CONFIG_MEDIATEK_NETSYS_RX_V2)
 +static struct hnat_desc {
 +	u32 entry : 15;
 +	u32 filled : 3;
@@ -135,13 +152,29 @@
 +	u32 resv5 : 20;
 +	u32 magic_tag_protect : 16;
 +} __packed;
++#else
++static struct hnat_desc {
++	u32 entry : 14;
++	u32 crsn : 5;
++	u32 sport : 4;
++	u32 alg : 1;
++	u32 iface : 8;
++	u32 ppe : 1;
++	u32 filled : 3;
++	u32 magic_tag_protect : 16;
++	u32 wdmaid : 8;
++	u32 rxid : 2;
++	u32 wcid : 10;
++	u32 bssid : 6;
++} __packed;
++#endif
 +#define HIT_BIND_KEEPALIVE_DUP_OLD_HDR 0x15
 +#define skb_hnat_reason(skb) (((struct hnat_desc *)(skb->head))->crsn)
 +
  /* Returns one of the generic firewall policies, like NF_ACCEPT. */
  unsigned int
  ip6t_do_table(struct sk_buff *skb,
-@@ -262,7 +283,12 @@
+@@ -262,7 +302,12 @@
  	const struct xt_table_info *private;
  	struct xt_action_param acpar;
  	unsigned int addend;
@@ -155,15 +188,7 @@
  	/* Initialization */
  	stackidx = 0;
  	indev = state->in ? state->in->name : nulldevname;
-@@ -285,6 +311,7 @@
- 	cpu        = smp_processor_id();
- 	table_base = private->entries;
- 	jumpstack  = (struct ip6t_entry **)private->jumpstack[cpu];
-+	
- 
- 	/* Switch to alternate jumpstack if we're being invoked via TEE.
- 	 * TEE issues XT_CONTINUE verdict on original skb so we must not
-@@ -321,7 +348,20 @@
+@@ -321,7 +367,20 @@
  
  		counter = xt_get_this_cpu_counter(&e->counters);
  		ADD_COUNTER(*counter, skb->len, 1);
