@@ -245,9 +245,9 @@ function parseDatabase(raw, hosts, showZero, hideMACs) {
 }
 
 function parseDefaultSettings(file) {
-	var defaultColumns = ['thClient', 'thDownload', 'thUpload', 'thTotalDown', 'thTotalUp', 'thTotal'],
+	var defaultColumns = ['thClient', 'thMAC','thDownload', 'thUpload', 'thTotalDown', 'thTotalUp', 'thTotal' , 'thlastSeen'],
 	    keylist = ['protocol', 'interval', 'showColumns', 'showZero', 'useBits', 'useMultiple', 'useDSL', 'upstream', 'downstream', 'hideMACs'],
-	    valuelist = ['ipv4', '5', defaultColumns, true, false, '1000', false, '100', '100', []];
+	    valuelist = ['ipv4', '3', defaultColumns, false, false, '1000', false, '100', '100', []];
 
 	return fs.read_direct(file, 'json').then(function(oldSettings) {
 		var settings = {};
@@ -549,14 +549,14 @@ return view.extend({
 		    table = E('table', { 'class': 'table', 'id': 'traffic' }, [
 					E('tr', { 'class': 'tr table-titles' }, [
 						E('th', { 'class': 'th', 'id': 'thClient' }, _('Clients')),
-						E('th', { 'class': 'th hide', 'id': 'thMAC' }, _('MAC')),
+						E('th', { 'class': 'th', 'id': 'thMAC' }, _('MAC')),
 						E('th', { 'class': 'th', 'id': 'thDownload' }, _('Download')),
 						E('th', { 'class': 'th', 'id': 'thUpload' }, _('Upload')),
 						E('th', { 'class': 'th', 'id': 'thTotalDown' }, _('Total Down')),
 						E('th', { 'class': 'th', 'id': 'thTotalUp' }, _('Total Up')),
 						E('th', { 'class': 'th sorted', 'id': 'thTotal' }, _('Total')),
 						E('th', { 'class': 'th hide', 'id': 'thFirstSeen' }, _('First Seen')),
-						E('th', { 'class': 'th hide', 'id': 'thLastSeen' }, _('Last Seen'))
+						E('th', { 'class': 'th', 'id': 'thLastSeen' }, _('Last Seen'))
 					]),
 					E('tr', {'class': 'tr placeholder'}, [
 						E('td', { 'class': 'td' }, E('em', {}, _('Collecting data...')))
