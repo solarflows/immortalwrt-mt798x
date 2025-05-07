@@ -23,8 +23,8 @@ if [ "$ra0_7981" -eq "1" ] || [ "$ra0_7986" -eq "1" ]; then
     ra0=1
 fi
 
-ra0_7981="$(uci get  wireless.default_MT7981_1_2.steeringthresold)"
-ra0_7986="$(uci get  wireless.default_MT7981_1_2.steeringthresold)"
+ra0_7981="$(uci get wireless.default_MT7981_1_2.steeringthresold)"
+ra0_7986="$(uci get wireless.default_MT7981_1_2.steeringthresold)"
 if [ "$ra0_7981" -lt "0" ] || [ "$ra0_7986" -lt "0" ]; then
     ra0=1
 fi
