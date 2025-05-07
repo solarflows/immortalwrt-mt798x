@@ -100,27 +100,28 @@ case "$1" in
 		ip="$2"
 		dl="$3"
 		up="$4"
-		id="$5" idpair=$((id+32))
+		id="$5"
+		idpair=$((id+32))
 		macaddr="$6"
+		interface="$7"
 		cnt=$(tc class show dev $dev | wc -l)
 
-		interface="$7"
 		if [ $id -lt 32 ]; then
-			iptables -t mangle -D eqos -s $ip -j DSCP --set-dscp ${id}
-			iptables -t mangle -D eqos -d $ip -j DSCP --set-dscp ${idpair}
-			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark ${id}
-			ebtables -t nat -D eqos -p ipv6 -d $macaddr -j mark --mark-set ${idpair}
+			iptables -t mangle -D eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
+			iptables -t mangle -D eqos -m mac --mac-destination $macaddr -j DSCP --set-dscp ${idpair}
+			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
+			ebtables -t nat -D eqos -p ipv6 -d $macaddr -j DSCP --set-dscp ${idpair}
 
 			if [ $up -ne 0 ]; then
 				echo 2 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq${id}
-				iptables -t mangle -A eqos -s $ip -j DSCP --set-dscp ${id}
-				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark ${id}
+				iptables -t mangle -A eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
+				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
 			fi
 
 			if [ $dl -ne 0 ]; then
 				echo 3 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq${idpair}
-				iptables -t mangle -A eqos -d $ip -j DSCP --set-dscp ${idpair}
-				ebtables -t nat -A eqos -p ipv6 -d $macaddr -j mark --mark-set ${idpair}
+				iptables -t mangle -A eqos -m mac --mac-destination $macaddr -j DSCP --set-dscp ${idpair}
+				ebtables -t nat -A eqos -p ipv6 -d $macaddr -j DSCP --set-dscp ${idpair}
 			fi
 		else
 			iptables -t mangle -D eqos -s $ip -j MARK --set-mark 0x99
@@ -143,8 +144,8 @@ case "$1" in
 		fi
 
 		if [ $interface ]; then
-			iptables -t mangle -D PREROUTING -s $ip -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface"
-			iptables -t mangle -A PREROUTING -s $ip -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface"
+			iptables -t mangle -D PREROUTING -m mac --mac-source $macaddr -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface"
+			iptables -t mangle -A PREROUTING -m mac --mac-source $macaddr -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface"
 			iptables -t mangle -D PREROUTING -i br-lan -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark
 			iptables -t mangle -A PREROUTING -i br-lan -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark
 		fi
