@@ -2,6 +2,12 @@
 
 dev=br-lan
 
+# 添加日志函数
+log() {
+    logger -t eqos -p user.info "$1"
+	# echo "$1"
+}
+
 stop_qos() {
 	# 删除tc规则
 	tc qdisc del dev $dev root 2>/dev/null
@@ -28,7 +34,7 @@ start_qos() {
 }
 
 iptables_stop() {
-	logger -t eqos "Cleaning up iptables rules"
+	log "Cleaning up iptables rules"
 
 	# 删除eqos链
 	# 删除调用
@@ -80,7 +86,7 @@ iptables_stop() {
 }
 
 iptables_start_prepare() {
-	logger -t eqos "Prepare iptables structures"
+	log "Prepare iptables structures"
 	# 清除所有现存的DSCP标记
 	iptables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
 	iptables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
@@ -93,14 +99,14 @@ iptables_start_prepare() {
 }
 
 iptables_start_inital() {
-	logger -t eqos "Initializing iptables structures"
+	log "Initializing iptables structures"
 	# 创建并清空eqos链
 	iptables -t mangle -N eqos
 	iptables -t mangle -F eqos
 
 	# 调用eqos链
 	iptables -t mangle -D FORWARD -j eqos
-	iptables -t mangle -A FORWARD -j eqos || logger -t eqos "ERROR: Failed to attach eqos chain to FORWARD"
+	iptables -t mangle -A FORWARD -j eqos || log "ERROR: Failed to attach eqos chain to FORWARD"
 
 	# 开启HQoS
 	echo 1 > /sys/kernel/debug/hnat/qos_toggle
@@ -130,10 +136,10 @@ case "$1" in
 	"stop")
 		stop_qos
 		iptables_stop
-		logger -t eqos "Stopping QoS subsystem"
+		log "Stopping QoS subsystem"
 	;;
 	"start")
-		logger -t eqos "Initializing QoS subsystem - DL: $2Mbps, UL: $3Mbps"
+		log "Initializing QoS subsystem - DL: $2Mbps, UL: $3Mbps"
 		stop_qos
 		iptables_start_prepare
 		start_qos $2 $3
@@ -150,7 +156,7 @@ case "$1" in
 		macaddr="$6"
 		interface="$7"
 		cnt=$(tc class show dev $dev | wc -l)
-		logger -t eqos "Adding QoS rule: IP=$2, DL=$3Kbps, UL=$4Kbps, ID=$5, MAC=$6, IF=$7"
+		log "Adding QoS rule: IP=$2, DL=$3Kbps, UL=$4Kbps, ID=$5, MAC=$6, IF=$7"
 
 		# 硬件hqos队列的最大长度为32
 		if [ $id -lt 32 ]; then

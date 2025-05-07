@@ -4,6 +4,12 @@
 START=50
 USE_PROCD=1
 
+# 添加日志函数
+log() {
+    logger -t eqos -p user.info "$1"
+	# echo "$1"
+}
+
 # 逐个设备的规则设置
 parse_device() {
 	local cfg="$1"
@@ -20,7 +26,7 @@ parse_device() {
 	config_get mac "$cfg" "mac"
 	config_get interfacename "$cfg" "interfacename"
 
-    logger -t eqos "Processing device: IP=$ip, MAC=$mac, DL=${download}Kbps, UL=${upload}Kbps, Interface=$interfacename"
+    log "Processing device: IP=$ip, MAC=$mac, DL=${download}Kbps, UL=${upload}Kbps, Interface=$interfacename"
 	eqos add "$ip" "$download" "$upload" "$comment" "$mac" "$interfacename"
 }
 
@@ -41,7 +47,7 @@ start_service() {
 	config_get_bool ipv6enabled "config" "ipv6enabled" "0"
 
 	# 设置全局限速
-	logger -t eqos "Starting EQoS service - Download: ${download}Mbps, Upload: ${upload}Mbps, SmartQoS: $smarthqos, IPv6: $ipv6enabled"
+	log "Starting EQoS service - Download: ${download}Mbps, Upload: ${upload}Mbps, SmartQoS: $smarthqos, IPv6: $ipv6enabled"
 	eqos start "$download" "$upload" "$comment"
 
 	# IPv6独立配置
@@ -82,7 +88,7 @@ start_service() {
 		echo 3 1 $(($download*150)) 1 $(($download*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq59
 
 		# IPv4 规则
-		logger -t eqos "Setting up IPv4 traffic classification"
+		log "Setting up IPv4 traffic classification"
 
 		# 小包优先
 		iptables -t mangle -A eqos -i br-lan -m length --length :256 -j DSCP --set-dscp 28 -m comment --comment "EQoS_PACKETS_PREFER"
@@ -122,7 +128,7 @@ start_service() {
 		-j DSCP --set-dscp 59
 
 		# IPv6 规则
-		logger -t eqos "Setting up IPv6 traffic classification"
+		log "Setting up IPv6 traffic classification"
 
 		# 小包优先
 		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j DSCP --set-dscp 28 -m comment --comment "EQoS_PACKETSV6_PREFER"
@@ -165,7 +171,7 @@ start_service() {
 
 	# 删除旧EQoS相关的PREROUTING规则（通过注释标识）
 	# iptables -t mangle -F PREROUTING
-    logger -t eqos "Cleaning existing PREROUTING rules"
+    log "Cleaning existing PREROUTING rules"
     iptables-save -t mangle | grep -E 'PREROUTING.*--comment "EQOS_' | while read line; do
         echo "${line//-A/-D}" | iptables-restore
     done 2>/dev/null
@@ -176,17 +182,17 @@ start_service() {
 	fi
 
 	# 设备限速
-	logger -t eqos "Starting device-specific configuration"
+	log "Starting device-specific configuration"
 	config_foreach parse_device "device"
 
-	logger -t eqos "Device configuration completed"
+	log "Device configuration completed"
 }
 
 stop_service() {
 	eqos stop
 	# 删除所有EQoS添加的PREROUTING规则
 	# iptables -t mangle -F PREROUTING
-    logger -t eqos "Cleaning existing PREROUTING rules"
+    log "Cleaning existing PREROUTING rules"
     iptables-save -t mangle | grep -E 'PREROUTING.*--comment "EQOS_' | while read line; do
         echo "${line//-A/-D}" | iptables-restore
     done 2>/dev/null
