@@ -67,39 +67,71 @@ start_service() {
 		echo 2 1 $(($upload*100)) 1 $(($upload*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq27
 		echo 3 1 $(($download*150)) 1 $(($download*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq59
 
+		# IPv4 规则
+		iptables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j DSCP --set-dscp 29
+		iptables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j DSCP --set-dscp 61
+
 		iptables -t mangle -A eqos -i br-lan -p tcp -j DSCP --set-dscp 31
 		iptables -t mangle -A eqos -o br-lan -p tcp -j DSCP --set-dscp 63
+
 		iptables -t mangle -A eqos -i br-lan -p udp -j DSCP --set-dscp 30
 		iptables -t mangle -A eqos -o br-lan -p udp -j DSCP --set-dscp 62
-		iptables -t mangle -A eqos -i br-lan -p tcp --dport 80 -j DSCP --set-dscp 29
-		iptables -t mangle -A eqos -o br-lan -p tcp --dport 80 -j DSCP --set-dscp 61
-		iptables -t mangle -A eqos -o br-lan -p tcp --dport 443 -j DSCP --set-dscp 29
-		iptables -t mangle -A eqos -o br-lan -p tcp --dport 443 -j DSCP --set-dscp 61
-		iptables -t mangle -A eqos -i br-lan -p tcp --dport 8080 -j DSCP --set-dscp 29
-		iptables -t mangle -A eqos -o br-lan -p tcp --dport 8080 -j DSCP --set-dscp 61
-		iptables -t mangle -A eqos -i br-lan -p tcp --dport 8081 -j DSCP --set-dscp 29
-		iptables -t mangle -A eqos -o br-lan -p tcp --dport 8081 -j DSCP --set-dscp 61
+
 		iptables -t mangle -A eqos -i br-lan -m length --length :256 -j DSCP --set-dscp 28
 		iptables -t mangle -A eqos -o br-lan -m length --length :256 -j DSCP --set-dscp 60
-		iptables -t mangle -A eqos -i br-lan -p udp -m hashlimit --hashlimit-mode srcip,srcport --hashlimit-name udpout --hashlimit-above 5/sec --hashlimit-burst 5 --hashlimit-htable-expire 10000 --hashlimit-htable-gcinterval 10000 -j DSCP --set-dscp 27
-		iptables -t mangle -A eqos -o br-lan -p udp -m hashlimit --hashlimit-mode dstip,dstport --hashlimit-name udpin --hashlimit-above 5/sec --hashlimit-burst 5 --hashlimit-htable-expire 10000 --hashlimit-htable-gcinterval 10000 -j DSCP --set-dscp 59
 
-		ip6tables -t mangle -A eqos -i br-lan -j MARK --set-mark 31
-		ip6tables -t mangle -A eqos -o br-lan -j MARK --set-mark 63
-		ip6tables -t mangle -A eqos -p udp -i br-lan -j MARK --set-mark 30
-		ip6tables -t mangle -A eqos -p udp -o br-lan -j MARK --set-mark 62
-		ip6tables -t mangle -A eqos -i br-lan -p tcp --dport 80 -j MARK --set-mark 29
-		ip6tables -t mangle -A eqos -o br-lan -p tcp --dport 80 -j MARK --set-mark 61
-		ip6tables -t mangle -A eqos -i br-lan -p tcp --dport 443 -j MARK --set-mark 29
-		ip6tables -t mangle -A eqos -o br-lan -p tcp --dport 443 -j MARK --set-mark 61
-		ip6tables -t mangle -A eqos -i br-lan -p tcp --dport 8080 -j MARK --set-mark 29
-		ip6tables -t mangle -A eqos -o br-lan -p tcp --dport 8080 -j MARK --set-mark 61
-		ip6tables -t mangle -A eqos -i br-lan -p tcp --dport 8081 -j MARK --set-mark 29
-		ip6tables -t mangle -A eqos -o br-lan -p tcp --dport 8081 -j MARK --set-mark 61
-		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark 28
-		ip6tables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark 60
-		ip6tables -t mangle -A eqos -i br-lan -p udp -m hashlimit --hashlimit-mode srcip,srcport --hashlimit-name udp6out --hashlimit-above 5/sec --hashlimit-burst 5 --hashlimit-htable-expire 10000 --hashlimit-htable-gcinterval 10000 -j MARK --set-mark 27
-		ip6tables -t mangle -A eqos -o br-lan -p udp -m hashlimit --hashlimit-mode dstip,dstport --hashlimit-name udp6in --hashlimit-above 5/sec --hashlimit-burst 5 --hashlimit-htable-expire 10000 --hashlimit-htable-gcinterval 10000 -j MARK --set-mark 59
+		iptables -t mangle -A eqos -i br-lan -p udp \
+		-m hashlimit \
+		--hashlimit-mode srcip,srcport \
+		--hashlimit-name udpout \
+		--hashlimit-above 5/sec \
+		--hashlimit-burst 5 \
+		--hashlimit-htable-expire 10000 \
+		--hashlimit-htable-gcinterval 10000 \
+		-j DSCP --set-dscp 27
+
+		iptables -t mangle -A eqos -o br-lan -p udp \
+		-m hashlimit \
+		--hashlimit-mode dstip,dstport \
+		--hashlimit-name udpin \
+		--hashlimit-above 5/sec \
+		--hashlimit-burst 5 \
+		--hashlimit-htable-expire 10000 \
+		--hashlimit-htable-gcinterval 10000 \
+		-j DSCP --set-dscp 59
+
+		# IPv6 规则（已改为DSCP标记）
+		ip6tables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j DSCP --set-dscp 29
+		ip6tables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j DSCP --set-dscp 61
+
+		ip6tables -t mangle -A eqos -i br-lan -p tcp -j DSCP --set-dscp 31
+		ip6tables -t mangle -A eqos -o br-lan -p tcp -j DSCP --set-dscp 63
+
+		ip6tables -t mangle -A eqos -i br-lan -p udp -j DSCP --set-dscp 30
+		ip6tables -t mangle -A eqos -o br-lan -p udp -j DSCP --set-dscp 62
+
+		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j DSCP --set-dscp 28
+		ip6tables -t mangle -A eqos -o br-lan -m length --length :256 -j DSCP --set-dscp 60
+
+		ip6tables -t mangle -A eqos -i br-lan -p udp \
+		-m hashlimit \
+		--hashlimit-mode srcip,srcport \
+		--hashlimit-name udp6out \
+		--hashlimit-above 5/sec \
+		--hashlimit-burst 5 \
+		--hashlimit-htable-expire 10000 \
+		--hashlimit-htable-gcinterval 10000 \
+		-j DSCP --set-dscp 27
+
+		ip6tables -t mangle -A eqos -o br-lan -p udp \
+		-m hashlimit \
+		--hashlimit-mode dstip,dstport \
+		--hashlimit-name udp6in \
+		--hashlimit-above 5/sec \
+		--hashlimit-burst 5 \
+		--hashlimit-htable-expire 10000 \
+		--hashlimit-htable-gcinterval 10000 \
+		-j DSCP --set-dscp 59
 	fi
 
 	iptables -t mangle -F PREROUTING
