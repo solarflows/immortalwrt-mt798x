@@ -3,6 +3,7 @@
 dev=br-lan
 
 stop_qos() {
+	# 删除tc规则
 	tc qdisc del dev $dev root 2>/dev/null
 	tc qdisc del dev $dev ingress 2>/dev/null
 	tc qdisc del dev ${dev}-ifb root 2>/dev/null
@@ -12,7 +13,7 @@ stop_qos() {
 start_qos() {
 	local dl=$1
 	local up=$2
-
+	# 创建的tc规则
 	tc qdisc add dev $dev root handle 1: htb
 	tc class add dev $dev parent 1: classid 1:1 htb rate ${dl}mbit
 
@@ -27,18 +28,42 @@ start_qos() {
 }
 
 iptables_stop() {
+	logger -t eqos "Cleaning up iptables rules"
+
+	# 删除eqos链
+	# 删除调用
 	iptables -t mangle -D FORWARD -j eqos
 	ip6tables -t mangle -D FORWARD -j eqos
 	ebtables -t nat -D POSTROUTING -j eqos -p ipv6
+	# 删除链
+	iptables -t mangle -F eqos
+	ip6tables -t mangle -F eqos
+	ebtables -t nat -F eqos
+	iptables -t mangle -X eqos
+	ip6tables -t mangle -X eqos
+	ebtables -t nat -X eqos
+
+	# 关闭HQoS
 	echo 0 > /sys/kernel/debug/hnat/qos_toggle
+
+	# 删除firewall的规则
 	sed -i '/\/etc\/init.d\/eqos start/d' /etc/firewall.user
+
+	# 设置所有删除设置的DSCP标记
 	iptables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
 	iptables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
 	ip6tables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
 	ip6tables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
+	
+	# 关闭HNat的DSCP支持
 	echo "10 0" > /sys/kernel/debug/hnat/hnat_setting
-	echo "11 30" >/sys/kernel/debug/hnat/hnat_setting
 
+	# 回调hnat band rate
+	echo "11 30" >/sys/kernel/debug/hnat/hnat_setting
+	uci -q set "turboacc.config.fastpath_mh_eth_hnat_bind_rate"="30"
+	uci -q commit "turboacc"
+
+	# 清空HQoS上传下载限速
 	for i in $(seq 0 31); do
 		echo 0 0 0 0 0 4 4 > /sys/kernel/debug/hnat/qdma_txq$i
 	done
@@ -47,13 +72,16 @@ iptables_stop() {
 		echo 1 0 0 0 0 4 4 > /sys/kernel/debug/hnat/qdma_txq$i
 	done
 
-	echo 0 wrr 10000000 > /sys/kernel/debug/hnat/qdma_sch0
-	echo 0 wrr 10000000 > /sys/kernel/debug/hnat/qdma_sch1
-	echo 0 wrr 10000000 > /sys/kernel/debug/hnat/qdma_sch2
-	echo 0 wrr 10000000 > /sys/kernel/debug/hnat/qdma_sch3
+	# 禁用全局限速
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch0
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch1
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch2
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch3
 }
 
 iptables_start_prepare() {
+	logger -t eqos "Prepare iptables structures"
+	# 清除所有现存的DSCP标记
 	iptables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
 	iptables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
 	iptables -t mangle -A FORWARD -i br-lan -j DSCP --set-dscp 0
@@ -65,20 +93,35 @@ iptables_start_prepare() {
 }
 
 iptables_start_inital() {
+	logger -t eqos "Initializing iptables structures"
+	# 创建并清空eqos链
 	iptables -t mangle -N eqos
 	iptables -t mangle -F eqos
+
+	# 调用eqos链
 	iptables -t mangle -D FORWARD -j eqos
-	iptables -t mangle -A FORWARD -j eqos
+	iptables -t mangle -A FORWARD -j eqos || logger -t eqos "ERROR: Failed to attach eqos chain to FORWARD"
+
+	# 开启HQoS
 	echo 1 > /sys/kernel/debug/hnat/qos_toggle
-	echo 0 wrr 10000000 > /sys/kernel/debug/hnat/qdma_sch0
-	echo 0 wrr 10000000 > /sys/kernel/debug/hnat/qdma_sch1
+
+	# 设置全局限速
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch0
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch1
+
 	echo 0 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq0
 	echo 1 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq8
+
+	# 下调HNat band rate
 	echo "11 5" >/sys/kernel/debug/hnat/hnat_setting
 	uci -q set "turboacc.config.fastpath_mh_eth_hnat_bind_rate"="5"
 	uci -q commit "turboacc"
+
+	# 添加规则到firewall.user
 	sed -i '/\/etc\/init.d\/eqos start/d' /etc/firewall.user
 	echo "/etc/init.d/eqos start" >> /etc/firewall.user
+
+	# 开启HNat DSCP支持
 	echo "10 1" > /sys/kernel/debug/hnat/hnat_setting
 }
 
@@ -87,8 +130,10 @@ case "$1" in
 	"stop")
 		stop_qos
 		iptables_stop
+		logger -t eqos "Stopping QoS subsystem"
 	;;
 	"start")
+		logger -t eqos "Initializing QoS subsystem - DL: $2Mbps, UL: $3Mbps"
 		stop_qos
 		iptables_start_prepare
 		start_qos $2 $3
@@ -103,26 +148,31 @@ case "$1" in
 		id="$5" idpair=$((id+32))
 		macaddr="$6"
 		cnt=$(tc class show dev $dev | wc -l)
+		logger -t eqos "Adding QoS rule: IP=$2, DL=$3Kbps, UL=$4Kbps, ID=$5, MAC=$6, IF=$7"
 
-		interface="$7"
+		# 硬件hqos队列的最大长度为32
 		if [ $id -lt 32 ]; then
+			# 删除现有规则
 			iptables -t mangle -D eqos -s $ip -j DSCP --set-dscp ${id}
 			iptables -t mangle -D eqos -d $ip -j DSCP --set-dscp ${idpair}
 			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark ${id}
 			ebtables -t nat -D eqos -p ipv6 -d $macaddr -j mark --mark-set ${idpair}
 
+			# 创建上传规则
 			if [ $up -ne 0 ]; then
 				echo 2 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq${id}
 				iptables -t mangle -A eqos -s $ip -j DSCP --set-dscp ${id}
 				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark ${id}
 			fi
 
+			# 创建下载规则
 			if [ $dl -ne 0 ]; then
 				echo 3 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq${idpair}
 				iptables -t mangle -A eqos -d $ip -j DSCP --set-dscp ${idpair}
 				ebtables -t nat -A eqos -p ipv6 -d $macaddr -j mark --mark-set ${idpair}
 			fi
 		else
+			# 大于队列32则使用传统eqos的规则
 			iptables -t mangle -D eqos -s $ip -j MARK --set-mark 0x99
 			iptables -t mangle -D eqos -d $ip -j MARK --set-mark 0x99
 
@@ -135,6 +185,7 @@ case "$1" in
 			fi
 		fi
 
+		# 大于队列32则使用传统eqos的规则
 		if [ $id -gt 31 ]; then
 			tc class add dev $dev parent 1:1 classid 1:1$cnt htb rate ${dl}kbit ceil ${dl}kbit
 			tc filter add dev $dev parent 1:0 protocol ip u32 match ip dst $ip flowid 1:1$cnt
@@ -142,11 +193,12 @@ case "$1" in
 			tc filter add dev ${dev}-ifb parent 1:0 protocol ip u32 match ip src $ip flowid 1:1$cnt
 		fi
 
+		# 多接口负载均衡
 		if [ $interface ]; then
-			iptables -t mangle -D PREROUTING -s $ip -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface"
-			iptables -t mangle -A PREROUTING -s $ip -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface"
-			iptables -t mangle -D PREROUTING -i br-lan -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark
-			iptables -t mangle -A PREROUTING -i br-lan -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark
+			iptables -t mangle -D PREROUTING -m mac --mac-source $macaddr -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface" -m comment --comment "EQoS_DEVICE_$macaddr"
+			iptables -t mangle -A PREROUTING -m mac --mac-source $macaddr -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface" -m comment --comment "EQoS_DEVICE_$macaddr"
+			iptables -t mangle -D PREROUTING -i br-lan -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark -m comment --comment "EQoS_DEVICE_$macaddr"
+			iptables -t mangle -A PREROUTING -i br-lan -m conntrack --ctstate ESTABLISHED,RELATED -j CONNMARK --restore-mark -m comment --comment "EQoS_DEVICE_$macaddr"
 		fi
 	;;
 	*)
