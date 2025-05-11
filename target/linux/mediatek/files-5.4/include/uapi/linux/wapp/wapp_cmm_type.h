@@ -1188,6 +1188,7 @@ typedef union GNU_PACKED _wapp_event_data {
 	u8 eht_ch_change;
 #endif
 } wapp_event_data;
+
 struct GNU_PACKED _wapp_event2_data {
 	wapp_client_info cli_info;
 };
