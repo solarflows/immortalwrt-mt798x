@@ -1,3 +1,7 @@
 #!/bin/sh
 
+[ "$ACTION" = "ifupdate" ] && [ "$STATE" != "up" ] && exit 0
+
+logger -t "eqos-hotplug" "Event triggered: ACTION=$ACTION, INTERFACE=$INTERFACE, DEVICE=$DEVICE, STATE=$STATE"
+
 /etc/init.d/eqos start
