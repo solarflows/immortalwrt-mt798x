@@ -1190,6 +1190,17 @@ typedef union GNU_PACKED _wapp_event_data {
 #endif
 } wapp_event_data;
 
+struct GNU_PACKED _wapp_event2_data {
+	wapp_client_info cli_info;
+};
+
+struct GNU_PACKED wapp_event2 {
+	u8 len;
+	u8 event_id;
+	u32 ifindex;
+	struct _wapp_event2_data data;
+};
+
 struct GNU_PACKED wapp_event {
 	u8 len;
 	u8 event_id;
