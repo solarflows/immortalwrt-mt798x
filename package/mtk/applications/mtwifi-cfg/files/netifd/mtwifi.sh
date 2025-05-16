@@ -47,7 +47,7 @@ mtwifi_vif_ap_config() {
 	if [ -n "$ifname" ]; then
 		logger -t "netifd-mtwifi" "add $ifname to vifidx $name"
 		wireless_add_vif "$name" "$ifname"
-		iwpriv "$ifname" set Debug=0
+		# iwpriv "$ifname" set Debug=0
 	fi
 }
 
@@ -67,7 +67,7 @@ mtwifi_vif_sta_config() {
 	if [ -n "$ifname" ]; then
 		logger -t "netifd-mtwifi" "add $ifname to vifidx $name"
 		wireless_add_vif "$name" "$ifname"
-		iwpriv "$ifname" set Debug=0
+		# iwpriv "$ifname" set Debug=0
 	fi
 }
 
