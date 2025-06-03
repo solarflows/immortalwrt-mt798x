@@ -219,6 +219,7 @@ ifndef DUMP
     endif
   endif
 endif
+TARGET_LINKER?=bfd
 TARGET_PATH_PKG:=$(STAGING_DIR)/host/bin:$(STAGING_DIR_HOSTPKG)/bin:$(TARGET_PATH)
 
 ifeq ($(CONFIG_SOFT_FLOAT),y)
