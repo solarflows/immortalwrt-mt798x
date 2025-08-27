@@ -1,7 +1,8 @@
 #!/bin/sh
 
-[ "$ACTION" = "ifupdate" ] && [ "$STATE" != "up" ] && exit 0
+[ "$ACTION" = ifup -o "$ACTION" = ifupdate ] || exit 0
+[ "$ACTION" = ifupdate -a -z "$IFUPDATE_ADDRESSES" -a -z "$IFUPDATE_DATA" ] && exit 0
 
-logger -t "eqos-hotplug" "Event triggered: ACTION=$ACTION, INTERFACE=$INTERFACE, DEVICE=$DEVICE, STATE=$STATE"
+logger -t "eqos-hotplug" "Restart for $ACTION of $INTERFACE ($DEVICE)"
 
-/etc/init.d/eqos start
+/etc/init.d/eqos restart
