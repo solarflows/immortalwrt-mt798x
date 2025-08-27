@@ -4,13 +4,13 @@
 START=50
 USE_PROCD=1
 
-# 添加日志函数
+# log function
 dbg() {
     logger -t eqos -p user.info "$1"
 	echo "$1"
 }
 
-# 逐个设备的规则设置
+# per-device rule setup
 parse_device() {
 	local cfg="$1"
 
@@ -30,7 +30,7 @@ parse_device() {
 	eqos add "$ip" "$download" "$upload" "$comment" "$mac" "$interfacename"
 }
 
-# 启动整个服务
+# start the whole service
 start_service() {
 	config_load "eqos"
 
@@ -46,136 +46,143 @@ start_service() {
 	config_get interface "config" "interface"
 	config_get_bool ipv6enabled "config" "ipv6enabled" "0"
 
-	# 设置全局限速
+	# set global speed limit
 	dbg "Starting EQoS service - Download: ${download}Mbps, Upload: ${upload}Mbps, SmartQoS: $smarthqos, IPv6: $ipv6enabled"
 	eqos start "$download" "$upload"
 
-	# IPv6独立配置
+	# independent config for IPv6
 	if [ "$ipv6enabled" -eq "1" ]; then
-		# 为ipv6新建并且清空eqos链
+		# create and flush eqos chain for ipv6
 		ip6tables -t mangle -N eqos
 		ip6tables -t mangle -F eqos
 
-		# 删除现存eqos链,并且重新调用
+		# delete existing eqos chain and re-add
 		ip6tables -t mangle -D FORWARD -j eqos
 		ip6tables -t mangle -A FORWARD -j eqos
 	fi
 
-	# 硬件不公平队列
+	# hardware unfair queue
 	if [ "$smarthqos" -eq "1" ]; then
-		# 设置全局上传
+		# set global upload
 		for i in $(seq 1 31); do
 			if [ "$upload" -ne "0" ]; then
 				echo 2 1 $(($upload*225)) 1 $(($upload*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq$i
 			fi
 		done
 
-		# 设置全局下载
+		# set global download
 		for i in $(seq 33 63); do
 			if [ "$download" -ne "0" ]; then
 				echo 3 1 $(($download*200)) 1 $(($download*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq$i
 			fi
 		done
 
-		# 设置特殊队列的限速
+		# reserved queues for special use
 		echo 2 1 $(($upload*100)) 1 $(($upload*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq30
 		echo 3 1 $(($download*150)) 1 $(($download*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq62
 		echo 2 1 $(($upload*100)) 1 $(($upload*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq27
 		echo 3 1 $(($download*150)) 1 $(($download*1000)) 4 1 > /sys/kernel/debug/hnat/qdma_txq59
 
-		# IPv4 规则
+		# IPv4 Rules
 		dbg "Setting up IPv4 traffic classification"
 
-		# 小包优先
-		iptables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark $((28 \<\< 16)) -m comment --comment "EQoS_PACKETS_PREFER"
-		iptables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark $((60 \<\< 16)) -m comment --comment "EQoS_PACKETS_PREFER_RELAY"
+		# small packets prefer
+		iptables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark $((28 << 16)) -m comment --comment "EQoS_PACKETS_PREFER"
+		iptables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark $((60 << 16)) -m comment --comment "EQoS_PACKETS_PREFER_RELAY"
 
-		# 网页浏览数据
-		iptables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j MARK --set-mark $((29 \<\< 16)) -m comment --comment "EQoS_HTTP"
-		iptables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j MARK --set-mark $((61 \<\< 16)) -m comment --comment "EQoS_HTTP_REPLY"
+		# http browsing data
+		iptables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j MARK --set-mark $((29 << 16)) -m comment --comment "EQoS_HTTP"
+		iptables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j MARK --set-mark $((61 << 16)) -m comment --comment "EQoS_HTTP_REPLY"
 
-		# 全局TCP
-		iptables -t mangle -A eqos -i br-lan -p tcp -j MARK --set-mark $((31 \<\< 16)) -m comment --comment "EQoS_TCP"
-		iptables -t mangle -A eqos -o br-lan -p tcp -j MARK --set-mark $((63 \<\< 16)) -m comment --comment "EQoS_TCP_RELAY"
+		# global TCP
+		iptables -t mangle -A eqos -i br-lan -p tcp -j MARK --set-mark $((31 << 16)) -m comment --comment "EQoS_TCP"
+		iptables -t mangle -A eqos -o br-lan -p tcp -j MARK --set-mark $((63 << 16)) -m comment --comment "EQoS_TCP_RELAY"
 
-		# 全局UDP
-		iptables -t mangle -A eqos -i br-lan -p udp -j MARK --set-mark $((30 \<\< 16)) -m comment --comment "EQoS_UDP"
-		iptables -t mangle -A eqos -o br-lan -p udp -j MARK --set-mark $((62 \<\< 16)) -m comment --comment "EQoS_UDP_RELAY"
+		# global UDP
+		iptables -t mangle -A eqos -i br-lan -p udp -j MARK --set-mark $((30 << 16)) -m comment --comment "EQoS_UDP"
+		iptables -t mangle -A eqos -o br-lan -p udp -j MARK --set-mark $((62 << 16)) -m comment --comment "EQoS_UDP_RELAY"
 
-		# 限制高频发包
+		# limit high frequency packets
 		iptables -t mangle -A eqos -i br-lan -p udp \
 		-m hashlimit \
 		--hashlimit-mode srcip,srcport \
 		--hashlimit-name udpout \
-		--hashlimit-above 5/sec \
-		--hashlimit-burst 5 \
+		--hashlimit-above 50/sec \
+		--hashlimit-burst 10 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j MARK --set-mark $((27 \<\< 16))
+		-j MARK --set-mark $((27 << 16))
 
 		iptables -t mangle -A eqos -o br-lan -p udp \
 		-m hashlimit \
 		--hashlimit-mode dstip,dstport \
 		--hashlimit-name udpin \
-		--hashlimit-above 5/sec \
-		--hashlimit-burst 5 \
+		--hashlimit-above 50/sec \
+		--hashlimit-burst 10 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j MARK --set-mark $((59 \<\< 16))
+		-j MARK --set-mark $((59 << 16))
 
-		# IPv6 规则
+		# DNS bypass
+		iptables -t mangle -I eqos 1 -i br-lan -p udp --sport 53 -j RETURN -m comment --comment "EQoS_Bypass_DNS_REPLY"
+		iptables -t mangle -I eqos 1 -i br-lan -p udp --dport 53 -j RETURN -m comment --comment "EQoS_Bypass_DNS"
+
+		# IPv6 Rules
 		dbg "Setting up IPv6 traffic classification"
 
-		# 小包优先
-		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark $((28 \<\< 16)) -m comment --comment "EQoS_PACKETSV6_PREFER"
-		ip6tables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark $((60 \<\< 16)) -m comment --comment "EQoS_PACKETSV6_PREFER_RELAY"
+		# small packets prefer
+		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark $((28 << 16)) -m comment --comment "EQoS_PACKETSV6_PREFER"
+		ip6tables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark $((60 << 16)) -m comment --comment "EQoS_PACKETSV6_PREFER_RELAY"
 
-		# 网页浏览数据
-		ip6tables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j MARK --set-mark $((29 \<\< 16)) -m comment --comment "EQoS_HTTPv6"
-		ip6tables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j MARK --set-mark $((61 \<\< 16)) -m comment --comment "EQoS_HTTPv6_REPLY"
+		# http browsing data
+		ip6tables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j MARK --set-mark $((29 << 16)) -m comment --comment "EQoS_HTTPv6"
+		ip6tables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j MARK --set-mark $((61 << 16)) -m comment --comment "EQoS_HTTPv6_REPLY"
 
-		# 全局TCP
-		ip6tables -t mangle -A eqos -i br-lan -p tcp -j MARK --set-mark $((31 \<\< 16)) -m comment --comment "EQoS_TCPV6"
-		ip6tables -t mangle -A eqos -o br-lan -p tcp -j MARK --set-mark $((63 \<\< 16)) -m comment --comment "EQoS_TCPV6_RELAY"
+		# global TCP
+		ip6tables -t mangle -A eqos -i br-lan -p tcp -j MARK --set-mark $((31 << 16)) -m comment --comment "EQoS_TCPV6"
+		ip6tables -t mangle -A eqos -o br-lan -p tcp -j MARK --set-mark $((63 << 16)) -m comment --comment "EQoS_TCPV6_RELAY"
 
-		# 全局UDP
-		ip6tables -t mangle -A eqos -i br-lan -p udp -j MARK --set-mark $((30 \<\< 16)) -m comment --comment "EQoS_UDPV6"
-		ip6tables -t mangle -A eqos -o br-lan -p udp -j MARK --set-mark $((62 \<\< 16)) -m comment --comment "EQoS_UDPV6_RELAY"
+		# global UDP
+		ip6tables -t mangle -A eqos -i br-lan -p udp -j MARK --set-mark $((30 << 16)) -m comment --comment "EQoS_UDPV6"
+		ip6tables -t mangle -A eqos -o br-lan -p udp -j MARK --set-mark $((62 << 16)) -m comment --comment "EQoS_UDPV6_RELAY"
 
-
-		# 限制高频发包
+		# limit high frequency packets
 		ip6tables -t mangle -A eqos -i br-lan -p udp \
 		-m hashlimit \
 		--hashlimit-mode srcip,srcport \
 		--hashlimit-name udp6out \
-		--hashlimit-above 5/sec \
-		--hashlimit-burst 5 \
+		--hashlimit-above 50/sec \
+		--hashlimit-burst 10 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j MARK --set-mark $((27 \<\< 16))
+		-j MARK --set-mark $((27 << 16))
 
 		ip6tables -t mangle -A eqos -o br-lan -p udp \
 		-m hashlimit \
 		--hashlimit-mode dstip,dstport \
 		--hashlimit-name udp6in \
-		--hashlimit-above 5/sec \
-		--hashlimit-burst 5 \
+		--hashlimit-above 50/sec \
+		--hashlimit-burst 10 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j MARK --set-mark $((59 \<\< 16))
+		-j MARK --set-mark $((59 << 16))
+
+		# DNS bypass
+		ip6tables -t mangle -I eqos 1 -i br-lan -p udp --sport 53 -j RETURN -m comment --comment "EQoS_Bypass_DNS_REPLY"
+		ip6tables -t mangle -I eqos 1 -i br-lan -p udp --dport 53 -j RETURN -m comment --comment "EQoS_Bypass_DNS"
 	fi
 
-	# 删除旧EQoS相关的PREROUTING规则（通过注释标识）
+	# delete all existing PREROUTING rules added by EQoS
 	# iptables -t mangle -F PREROUTING
     dbg "Cleaning existing PREROUTING rules"
     iptables-save -t mangle | grep -E 'PREROUTING.*--comment "EQOS_' | sed 's/^-A/-D/' | iptables-restore -c 2>/dev/null
 
-	# 多接口负载均衡
+	# multi-interface load balancing
 	if [ $interface ]; then
 		bash /usr/sbin/loadbalance "$interface"
 	fi
 
-	# 设备限速
+	# per-device configuration
 	dbg "Starting device-specific configuration"
 	config_foreach parse_device "device"
 
@@ -184,7 +191,7 @@ start_service() {
 
 stop_service() {
 	eqos stop
-	# 删除所有EQoS添加的PREROUTING规则
+	# delete all existing PREROUTING rules added by EQoS
 	# iptables -t mangle -F PREROUTING
     dbg "Cleaning existing PREROUTING rules"
     iptables-save -t mangle | grep -E 'PREROUTING.*--comment "EQOS_' | sed 's/^-A/-D/' | iptables-restore -c 2>/dev/null

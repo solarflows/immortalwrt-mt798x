@@ -2,14 +2,14 @@
 
 dev=br-lan
 
-# 添加日志函数
+# adding log function
 dbg() {
     logger -t eqos -p user.info "$1"
 	echo "$1"
 }
 
 stop_qos() {
-	# 删除tc规则
+	# delete tc rules
 	tc qdisc del dev $dev root 2>/dev/null
 	tc qdisc del dev $dev ingress 2>/dev/null
 	tc qdisc del dev ${dev}-ifb root 2>/dev/null
@@ -19,7 +19,7 @@ stop_qos() {
 start_qos() {
 	local dl=$1
 	local up=$2
-	# 创建的tc规则
+	# creating tc rules
 	tc qdisc add dev $dev root handle 1: htb
 	tc class add dev $dev parent 1: classid 1:1 htb rate ${dl}mbit
 
@@ -36,12 +36,12 @@ start_qos() {
 iptables_stop() {
 	dbg "Cleaning up iptables rules"
 
-	# 删除eqos链
-	# 删除调用
+	# delete eqos chains
+	# delete calls
 	iptables -t mangle -D FORWARD -j eqos
 	ip6tables -t mangle -D FORWARD -j eqos
 	ebtables -t nat -D POSTROUTING -j eqos
-	# 删除链
+	# delete chains
 	iptables -t mangle -F eqos
 	ip6tables -t mangle -F eqos
 	ebtables -t nat -F eqos
@@ -49,37 +49,37 @@ iptables_stop() {
 	ip6tables -t mangle -X eqos
 	ebtables -t nat -X eqos
 
-	# 关闭HQoS
+	# disable HQoS
 	echo 0 > /sys/kernel/debug/hnat/qos_toggle
 
-	# 删除firewall触发eqos的指令
+	# delete firewall trigger for eqos
 	sed -i '/\/etc\/init.d\/eqos start/d' /etc/firewall.user
 
-	# 设置所有删除设置的DSCP标记
+	# remove all MARK marks set by eqos
 	iptables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
 	iptables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
 	ip6tables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
 	ip6tables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
 
-	# 关闭HNat的DSCP支持
-	echo "10 0" > /sys/kernel/debug/hnat/hnat_setting
+	# disable HNat DSCP support
+	# echo "10 0" > /sys/kernel/debug/hnat/hnat_setting
 
-	# 回调hnat band rate
+	# restore hnat band rate
 	echo "11 30" >/sys/kernel/debug/hnat/hnat_setting
 	uci -q set "turboacc.config.fastpath_mh_eth_hnat_bind_rate"="30"
 	uci -q commit "turboacc"
 
-	# 清空HQoS队列参数
-	## 设备下行队列
+	# Reset HQoS queue parameters
+	## downlink queues
 	for i in $(seq 0 31); do
 		echo 0 0 0 0 0 4 4 > /sys/kernel/debug/hnat/qdma_txq$i
 	done
-	## 设备上行队列
+	## uplink queues
 	for i in $(seq 32 63); do
 		echo 1 0 0 0 0 4 4 > /sys/kernel/debug/hnat/qdma_txq$i
 	done
 
-	# 清空HQoS调度器参数
+	# reset HQoS scheduler parameters
 	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch0
 	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch1
 	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch2
@@ -88,7 +88,7 @@ iptables_stop() {
 
 iptables_start_prepare() {
 	dbg "Prepare iptables structures"
-	# 清除所有现存的DSCP标记
+	# remove any existing MARK rules to avoid duplicates
 	iptables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
 	iptables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
 	iptables -t mangle -A FORWARD -i br-lan -j MARK --set-mark 0
@@ -102,40 +102,40 @@ iptables_start_prepare() {
 iptables_start_inital() {
 	dbg "Initializing iptables structures"
 
-	# 创建并清空eqos链
+	# create eqos chains
 	ebtables -t nat -N eqos
 	ebtables -t nat -F eqos
 	iptables -t mangle -N eqos
 	iptables -t mangle -F eqos
 
-	# 调用eqos链
+	# attach calls
 	iptables -t mangle -D FORWARD -j eqos
 	iptables -t mangle -A FORWARD -j eqos || dbg "ERROR: Failed to attach eqos chain to FORWARD"
 	ebtables -t nat -D POSTROUTING -j eqos
 	ebtables -t nat -A POSTROUTING -j eqos || dbg "ERROR: Failed to attach eqos chain to POSTROUTING"
 
-	# 开启HQoS
+	# enable HQoS
 	echo 1 > /sys/kernel/debug/hnat/qos_toggle
 
-	# 设置0和1HQoS调度器参数（0上行，1下行。WRR策略）
-	echo 1 wrr $(($1*1000)) > /sys/kernel/debug/hnat/qdma_sch0
-	echo 1 wrr $(($2*1000)) > /sys/kernel/debug/hnat/qdma_sch1
+	# set HQoS scheduler parameters to default(disable rate limiting,WRR mode,this two schedulers are used for general traffic)
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch0
+	echo 0 wrr 25000000 > /sys/kernel/debug/hnat/qdma_sch1
 
-	# 绑定特定HQoS队列参数到调度器0和1(绑定到0和1调度器,不启用最大最小限速,权重0等价于最高权重)
-	echo 0 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq0
-	echo 1 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq63
+	# binging HQoS queues to default(disable rate limiting)
+	echo 0 0 0 0 0 0 4 > /sys/kernel/debug/hnat/qdma_txq0
+	echo 1 0 0 0 0 0 4 > /sys/kernel/debug/hnat/qdma_txq63
 
-	# 下调HNat band rate
+	# set hnat bind rate to 5pps to let more packets go through hqos
 	echo "11 5" >/sys/kernel/debug/hnat/hnat_setting
 	uci -q set "turboacc.config.fastpath_mh_eth_hnat_bind_rate"="5"
 	uci -q commit "turboacc"
 
-	# 添加firewall触发eqos的指令
+	# add firewall trigger for eqos if not existing
 	sed -i '/\/etc\/init.d\/eqos start/d' /etc/firewall.user
 	echo "/etc/init.d/eqos start" >> /etc/firewall.user
 
-	# 开启HNat DSCP支持
-	echo "10 1" > /sys/kernel/debug/hnat/hnat_setting
+	# enable HNat DSCP support
+	# echo "10 1" > /sys/kernel/debug/hnat/hnat_setting
 }
 
 
@@ -151,10 +151,10 @@ case "$1" in
 		iptables_start_prepare
 		start_qos $2 $3
 		iptables_start_inital $2 $3
-		# 设置用于QoS的调度器参数
-		# downlink调度器2
+		# set HQoS scheduler parameters for uplink and downlink
+		# uplink scheduler
 		echo 1 wrr $(($3*1000)) > /sys/kernel/debug/hnat/qdma_sch2
-		# uplink调度器3
+		# downlink scheduler
 		echo 1 wrr $(($2*1000)) > /sys/kernel/debug/hnat/qdma_sch3
 	;;
 	"add")
@@ -168,27 +168,27 @@ case "$1" in
 		cnt=$(tc class show dev $dev | wc -l)
 		dbg "Adding Devices QoS rule: IP=$2, DL=$3Kbps, UL=$4Kbps, ID=$5, MAC=$6, IF=$7"
 
-		# 硬件hqos队列的最大长度为32
+		# HQoS queue max number is 32
 		if [ $id -lt 32 ]; then
-			# 删除现有规则
+			# delete existing rules
 			iptables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
 			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
 			ebtables -t nat -D eqos -d $macaddr -j mark --mark-set $((${idpair} \<\< 16))
 
-			# 创建上传规则
+			# create upload rule
 			if [ $up -ne 0 ]; then
 				echo 3 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq$((${id} \<\< 16))
 				iptables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
 				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
 			fi
 
-			# 创建下载规则
+			# create download rule
 			if [ $dl -ne 0 ]; then
 				echo 2 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq$((${idpair} \<\< 16))
 				ebtables -t nat -A eqos -d $macaddr -j mark --mark-set $((${idpair} \<\< 16))
 			fi
 		else
-			# 大于队列32则使用传统eqos的规则
+			# greater than queue 32 use traditional eqos rules
 			iptables -t mangle -D eqos -s $ip -j MARK --set-mark 0x99
 			iptables -t mangle -D eqos -d $ip -j MARK --set-mark 0x99
 
@@ -201,7 +201,7 @@ case "$1" in
 			fi
 		fi
 
-		# 大于队列32则使用传统eqos的规则
+		# set tc class for ip greater than 32
 		if [ $id -gt 31 ]; then
 			tc class add dev $dev parent 1:1 classid 1:1$cnt htb rate ${dl}kbit ceil ${dl}kbit
 			tc filter add dev $dev parent 1:0 protocol ip u32 match ip dst $ip flowid 1:1$cnt
@@ -209,7 +209,7 @@ case "$1" in
 			tc filter add dev ${dev}-ifb parent 1:0 protocol ip u32 match ip src $ip flowid 1:1$cnt
 		fi
 
-		# 多接口负载均衡
+		# multi-interface load balancing
 		if [ $interface ]; then
 			iptables -t mangle -D PREROUTING -m mac --mac-source $macaddr -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface" -m comment --comment "EQoS_DEVICE_$macaddr"
 			iptables -t mangle -A PREROUTING -m mac --mac-source $macaddr -m conntrack --ctstate NEW -j MARK --set-mark 2"$interface" -m comment --comment "EQoS_DEVICE_$macaddr"
