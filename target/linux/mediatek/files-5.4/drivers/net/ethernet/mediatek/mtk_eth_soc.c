@@ -27,6 +27,8 @@
 #include "mtk_eth_dbg.h"
 #include "mtk_eth_reset.h"
 
+#include "mtk_hnat/hqos_mark.h"
+
 #if defined(CONFIG_NET_MEDIATEK_HNAT) || defined(CONFIG_NET_MEDIATEK_HNAT_MODULE)
 #include "mtk_hnat/nf_hnat_mtk.h"
 #endif
@@ -1031,7 +1033,7 @@ static int mtk_tx_map(struct sk_buff *skb, struct net_device *dev,
 
 	nr_frags = skb_shinfo(skb)->nr_frags;
 
-        qid = skb->mark & (MTK_QDMA_TX_MASK);
+        qid = MTK_QOS_GET_MARK(skb->mark) & (MTK_QDMA_TX_MASK);
 
 #if defined(CONFIG_MEDIATEK_NETSYS_V2)
 	if(!qid && mac->id)

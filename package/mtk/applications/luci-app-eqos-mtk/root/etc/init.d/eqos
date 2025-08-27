@@ -87,20 +87,20 @@ start_service() {
 		dbg "Setting up IPv4 traffic classification"
 
 		# 小包优先
-		iptables -t mangle -A eqos -i br-lan -m length --length :256 -j DSCP --set-dscp 28 -m comment --comment "EQoS_PACKETS_PREFER"
-		iptables -t mangle -A eqos -o br-lan -m length --length :256 -j DSCP --set-dscp 60 -m comment --comment "EQoS_PACKETS_PREFER_RELAY"
+		iptables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark $((28 \<\< 16)) -m comment --comment "EQoS_PACKETS_PREFER"
+		iptables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark $((60 \<\< 16)) -m comment --comment "EQoS_PACKETS_PREFER_RELAY"
 
 		# 网页浏览数据
-		iptables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j DSCP --set-dscp 29 -m comment --comment "EQoS_HTTP"
-		iptables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j DSCP --set-dscp 61 -m comment --comment "EQoS_HTTP_REPLY"
+		iptables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j MARK --set-mark $((29 \<\< 16)) -m comment --comment "EQoS_HTTP"
+		iptables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j MARK --set-mark $((61 \<\< 16)) -m comment --comment "EQoS_HTTP_REPLY"
 
 		# 全局TCP
-		iptables -t mangle -A eqos -i br-lan -p tcp -j DSCP --set-dscp 31 -m comment --comment "EQoS_TCP"
-		iptables -t mangle -A eqos -o br-lan -p tcp -j DSCP --set-dscp 63 -m comment --comment "EQoS_TCP_RELAY"
+		iptables -t mangle -A eqos -i br-lan -p tcp -j MARK --set-mark $((31 \<\< 16)) -m comment --comment "EQoS_TCP"
+		iptables -t mangle -A eqos -o br-lan -p tcp -j MARK --set-mark $((63 \<\< 16)) -m comment --comment "EQoS_TCP_RELAY"
 
 		# 全局UDP
-		iptables -t mangle -A eqos -i br-lan -p udp -j DSCP --set-dscp 30 -m comment --comment "EQoS_UDP"
-		iptables -t mangle -A eqos -o br-lan -p udp -j DSCP --set-dscp 62 -m comment --comment "EQoS_UDP_RELAY"
+		iptables -t mangle -A eqos -i br-lan -p udp -j MARK --set-mark $((30 \<\< 16)) -m comment --comment "EQoS_UDP"
+		iptables -t mangle -A eqos -o br-lan -p udp -j MARK --set-mark $((62 \<\< 16)) -m comment --comment "EQoS_UDP_RELAY"
 
 		# 限制高频发包
 		iptables -t mangle -A eqos -i br-lan -p udp \
@@ -111,7 +111,7 @@ start_service() {
 		--hashlimit-burst 5 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j DSCP --set-dscp 27
+		-j MARK --set-mark $((27 \<\< 16))
 
 		iptables -t mangle -A eqos -o br-lan -p udp \
 		-m hashlimit \
@@ -121,26 +121,26 @@ start_service() {
 		--hashlimit-burst 5 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j DSCP --set-dscp 59
+		-j MARK --set-mark $((59 \<\< 16))
 
 		# IPv6 规则
 		dbg "Setting up IPv6 traffic classification"
 
 		# 小包优先
-		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j DSCP --set-dscp 28 -m comment --comment "EQoS_PACKETSV6_PREFER"
-		ip6tables -t mangle -A eqos -o br-lan -m length --length :256 -j DSCP --set-dscp 60 -m comment --comment "EQoS_PACKETSV6_PREFER_RELAY"
+		ip6tables -t mangle -A eqos -i br-lan -m length --length :256 -j MARK --set-mark $((28 \<\< 16)) -m comment --comment "EQoS_PACKETSV6_PREFER"
+		ip6tables -t mangle -A eqos -o br-lan -m length --length :256 -j MARK --set-mark $((60 \<\< 16)) -m comment --comment "EQoS_PACKETSV6_PREFER_RELAY"
 
 		# 网页浏览数据
-		ip6tables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j DSCP --set-dscp 29 -m comment --comment "EQoS_HTTPv6"
-		ip6tables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j DSCP --set-dscp 61 -m comment --comment "EQoS_HTTPv6_REPLY"
+		ip6tables -t mangle -A eqos -i br-lan -p tcp -m multiport --dports 80,443,8080,8081 -j MARK --set-mark $((29 \<\< 16)) -m comment --comment "EQoS_HTTPv6"
+		ip6tables -t mangle -A eqos -o br-lan -p tcp -m multiport --sports 80,443,8080,8081 -j MARK --set-mark $((61 \<\< 16)) -m comment --comment "EQoS_HTTPv6_REPLY"
 
 		# 全局TCP
-		ip6tables -t mangle -A eqos -i br-lan -p tcp -j DSCP --set-dscp 31 -m comment --comment "EQoS_TCPV6"
-		ip6tables -t mangle -A eqos -o br-lan -p tcp -j DSCP --set-dscp 63 -m comment --comment "EQoS_TCPV6_RELAY"
+		ip6tables -t mangle -A eqos -i br-lan -p tcp -j MARK --set-mark $((31 \<\< 16)) -m comment --comment "EQoS_TCPV6"
+		ip6tables -t mangle -A eqos -o br-lan -p tcp -j MARK --set-mark $((63 \<\< 16)) -m comment --comment "EQoS_TCPV6_RELAY"
 
 		# 全局UDP
-		ip6tables -t mangle -A eqos -i br-lan -p udp -j DSCP --set-dscp 30 -m comment --comment "EQoS_UDPV6"
-		ip6tables -t mangle -A eqos -o br-lan -p udp -j DSCP --set-dscp 62 -m comment --comment "EQoS_UDPV6_RELAY"
+		ip6tables -t mangle -A eqos -i br-lan -p udp -j MARK --set-mark $((30 \<\< 16)) -m comment --comment "EQoS_UDPV6"
+		ip6tables -t mangle -A eqos -o br-lan -p udp -j MARK --set-mark $((62 \<\< 16)) -m comment --comment "EQoS_UDPV6_RELAY"
 
 
 		# 限制高频发包
@@ -152,7 +152,7 @@ start_service() {
 		--hashlimit-burst 5 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j DSCP --set-dscp 27
+		-j MARK --set-mark $((27 \<\< 16))
 
 		ip6tables -t mangle -A eqos -o br-lan -p udp \
 		-m hashlimit \
@@ -162,7 +162,7 @@ start_service() {
 		--hashlimit-burst 5 \
 		--hashlimit-htable-expire 10000 \
 		--hashlimit-htable-gcinterval 10000 \
-		-j DSCP --set-dscp 59
+		-j MARK --set-mark $((59 \<\< 16))
 	fi
 
 	# 删除旧EQoS相关的PREROUTING规则（通过注释标识）

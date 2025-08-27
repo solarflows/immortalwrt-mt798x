@@ -56,10 +56,10 @@ iptables_stop() {
 	sed -i '/\/etc\/init.d\/eqos start/d' /etc/firewall.user
 
 	# 设置所有删除设置的DSCP标记
-	iptables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
-	iptables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
-	ip6tables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
-	ip6tables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
+	iptables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
+	iptables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
+	ip6tables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
+	ip6tables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
 
 	# 关闭HNat的DSCP支持
 	echo "10 0" > /sys/kernel/debug/hnat/hnat_setting
@@ -89,14 +89,14 @@ iptables_stop() {
 iptables_start_prepare() {
 	dbg "Prepare iptables structures"
 	# 清除所有现存的DSCP标记
-	iptables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
-	iptables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
-	iptables -t mangle -A FORWARD -i br-lan -j DSCP --set-dscp 0
-	iptables -t mangle -A FORWARD -o br-lan -j DSCP --set-dscp 0
-	ip6tables -t mangle -D FORWARD -i br-lan -j DSCP --set-dscp 0
-	ip6tables -t mangle -D FORWARD -o br-lan -j DSCP --set-dscp 0
-	ip6tables -t mangle -A FORWARD -i br-lan -j DSCP --set-dscp 0
-	ip6tables -t mangle -A FORWARD -o br-lan -j DSCP --set-dscp 0
+	iptables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
+	iptables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
+	iptables -t mangle -A FORWARD -i br-lan -j MARK --set-mark 0
+	iptables -t mangle -A FORWARD -o br-lan -j MARK --set-mark 0
+	ip6tables -t mangle -D FORWARD -i br-lan -j MARK --set-mark 0
+	ip6tables -t mangle -D FORWARD -o br-lan -j MARK --set-mark 0
+	ip6tables -t mangle -A FORWARD -i br-lan -j MARK --set-mark 0
+	ip6tables -t mangle -A FORWARD -o br-lan -j MARK --set-mark 0
 }
 
 iptables_start_inital() {
@@ -117,13 +117,13 @@ iptables_start_inital() {
 	# 开启HQoS
 	echo 1 > /sys/kernel/debug/hnat/qos_toggle
 
-	# 设置0和1HQoS调度器参数（不限速2.5G,WRR策略）
-	echo 1 wrr $(($2*1000)) > /sys/kernel/debug/hnat/qdma_sch0
-	echo 1 wrr $(($1*1000)) > /sys/kernel/debug/hnat/qdma_sch1
+	# 设置0和1HQoS调度器参数（0上行，1下行。WRR策略）
+	echo 1 wrr $(($1*1000)) > /sys/kernel/debug/hnat/qdma_sch0
+	echo 1 wrr $(($2*1000)) > /sys/kernel/debug/hnat/qdma_sch1
 
 	# 绑定特定HQoS队列参数到调度器0和1(绑定到0和1调度器,不启用最大最小限速,权重0等价于最高权重)
 	echo 0 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq0
-	echo 1 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq32
+	echo 1 0 0 0 0 0 0 > /sys/kernel/debug/hnat/qdma_txq63
 
 	# 下调HNat band rate
 	echo "11 5" >/sys/kernel/debug/hnat/hnat_setting
@@ -152,7 +152,9 @@ case "$1" in
 		start_qos $2 $3
 		iptables_start_inital $2 $3
 		# 设置用于QoS的调度器参数
+		# downlink调度器2
 		echo 1 wrr $(($3*1000)) > /sys/kernel/debug/hnat/qdma_sch2
+		# uplink调度器3
 		echo 1 wrr $(($2*1000)) > /sys/kernel/debug/hnat/qdma_sch3
 	;;
 	"add")
@@ -169,21 +171,21 @@ case "$1" in
 		# 硬件hqos队列的最大长度为32
 		if [ $id -lt 32 ]; then
 			# 删除现有规则
-			iptables -t mangle -D eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
-			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
-			ebtables -t nat -D eqos -d $macaddr -j mark --mark-set ${idpair}
+			iptables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
+			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
+			ebtables -t nat -D eqos -d $macaddr -j mark --mark-set $((${idpair} \<\< 16))
 
 			# 创建上传规则
 			if [ $up -ne 0 ]; then
-				echo 2 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq${id}
-				iptables -t mangle -A eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
-				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j DSCP --set-dscp ${id}
+				echo 3 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq$((${id} \<\< 16))
+				iptables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
+				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
 			fi
 
 			# 创建下载规则
 			if [ $dl -ne 0 ]; then
-				echo 3 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq${idpair}
-				ebtables -t nat -A eqos -d $macaddr -j mark --mark-set ${idpair}
+				echo 2 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq$((${idpair} \<\< 16))
+				ebtables -t nat -A eqos -d $macaddr -j mark --mark-set $((${idpair} \<\< 16))
 			fi
 		else
 			# 大于队列32则使用传统eqos的规则

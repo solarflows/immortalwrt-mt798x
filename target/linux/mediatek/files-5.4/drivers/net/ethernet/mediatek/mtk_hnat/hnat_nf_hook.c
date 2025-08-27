@@ -30,6 +30,8 @@
 #include "nf_hnat_mtk.h"
 #include "hnat.h"
 
+#include "hqos_mark.h"
+
 #include "../mtk_eth_soc.h"
 #include "../mtk_eth_reset.h"
 
@@ -1583,7 +1585,7 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 				if (IS_HQOS_MODE) {
 					entry.ipv4_hnapt.iblk2.qid =
 						(hnat_priv->data->version == MTK_HNAT_V4) ?
-						 skb->mark & 0x7f : skb->mark & 0xf;
+						 MTK_QOS_GET_MARK(skb->mark) & 0x7f : MTK_QOS_GET_MARK(skb->mark) & 0xf;
 					entry.ipv4_hnapt.iblk2.fqos = 1;
 				}
 
@@ -1701,15 +1703,15 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 		return 0;
 	}
 
-	if (IS_HQOS_MODE || skb->mark >= MAX_PPPQ_PORT_NUM)
-		qid = skb->mark & (MTK_QDMA_TX_MASK);
+	if (IS_HQOS_MODE || MTK_QOS_GET_MARK(skb->mark) >= MAX_PPPQ_PORT_NUM)
+		qid = MTK_QOS_GET_MARK(skb->mark) & (MTK_QDMA_TX_MASK);
 	else if (IS_PPPQ_MODE && (IS_DSA_1G_LAN(dev) || IS_DSA_WAN(dev)))
 		qid = port_id & MTK_QDMA_TX_MASK;
 	else
 		qid = 0;
 	if ((IS_HQOS_MODE) && (dscp!=0) &&(hnat_priv->dscp_en))
 		qid = (dscp>>2)& (MTK_QDMA_TX_MASK);
-		
+
 	if (IS_IPV4_GRP(foe)) {
 		entry.ipv4_hnapt.iblk2.dp = gmac;
 		entry.ipv4_hnapt.iblk2.port_mg =
@@ -1827,7 +1829,7 @@ int mtk_sw_nat_hook_tx(struct sk_buff *skb, int gmac_no)
 
 	if (!skb_hnat_is_hashed(skb))
 		return NF_ACCEPT;
-	
+
 	if (skb_hnat_entry(skb) >= hnat_priv->foe_etry_num ||
 	    skb_hnat_ppe(skb) >= CFG_PPE_NUM)
 		return NF_ACCEPT;
@@ -2141,8 +2143,8 @@ static void mtk_hnat_nf_update(struct sk_buff *skb)
 
 	if (unlikely(!skb_hnat_is_hashed(skb)))
 		return ;
-		
-	if (unlikely(skb->mark == HNAT_EXCEPTION_TAG))
+
+	if (unlikely(MTK_QOS_GET_MARK(skb->mark) == HNAT_EXCEPTION_TAG))
 		return ;
 
 	ct = nf_ct_get(skb, &ctinfo);
@@ -2171,16 +2173,16 @@ mtk_hnat_nf_conntrack(void *priv, struct sk_buff *skb,
 {
 	if (!skb)
 		goto drop;
-	
+
 	if (unlikely(skb_hnat_reason(skb) == HIT_BIND_KEEPALIVE_DUP_OLD_HDR))
 		{if (hnat_priv->data->per_flow_accounting && hnat_priv->nf_stat_en)
 			mtk_hnat_nf_update(skb);}
-		
+
 	return NF_ACCEPT;
-	
+
 drop:
-	
-	return NF_DROP;	
+
+	return NF_DROP;
 
 }
 
@@ -2209,8 +2211,8 @@ static unsigned int mtk_hnat_nf_post_routing(
 
 	if (unlikely(!skb_hnat_is_hashed(skb)))
 		return 0;
-		
-	if (unlikely(skb->mark == HNAT_EXCEPTION_TAG))
+
+	if (unlikely(MTK_QOS_GET_MARK(skb->mark) == HNAT_EXCEPTION_TAG))
 		return 0;
 
 	if (out->netdev_ops->ndo_flow_offload_check) {
