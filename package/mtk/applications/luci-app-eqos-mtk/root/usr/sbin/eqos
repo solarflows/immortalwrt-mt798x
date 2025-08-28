@@ -168,24 +168,24 @@ case "$1" in
 		cnt=$(tc class show dev $dev | wc -l)
 		dbg "Adding Devices QoS rule: IP=$2, DL=$3Kbps, UL=$4Kbps, ID=$5, MAC=$6, IF=$7"
 
-		# HQoS queue max number is 32
-		if [ $id -lt 32 ]; then
+		# HQoS queue max number is 20
+		if [ $id -lt 20  ]; then
 			# delete existing rules
-			iptables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
-			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
-			ebtables -t nat -D eqos -d $macaddr -j mark --mark-set $((${idpair} \<\< 16))
+			iptables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} << 16))
+			ip6tables -t mangle -D eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} << 16))
+			ebtables -t nat -D eqos -d $macaddr -j mark --mark-set $((${idpair} << 16))
 
 			# create upload rule
 			if [ $up -ne 0 ]; then
-				echo 3 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq$((${id} \<\< 16))
-				iptables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
-				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} \<\< 16))
+				echo 2 0 0 1 ${up} 4 1 > /sys/kernel/debug/hnat/qdma_txq${id}
+				iptables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} << 16))
+				ip6tables -t mangle -A eqos -m mac --mac-source $macaddr -j MARK --set-mark $((${id} << 16))
 			fi
 
 			# create download rule
 			if [ $dl -ne 0 ]; then
-				echo 2 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq$((${idpair} \<\< 16))
-				ebtables -t nat -A eqos -d $macaddr -j mark --mark-set $((${idpair} \<\< 16))
+				echo 3 0 0 1 ${dl} 4 1 > /sys/kernel/debug/hnat/qdma_txq${idpair}
+				ebtables -t nat -A eqos -d $macaddr -j mark --mark-set $((${idpair} << 16))
 			fi
 		else
 			# greater than queue 32 use traditional eqos rules
