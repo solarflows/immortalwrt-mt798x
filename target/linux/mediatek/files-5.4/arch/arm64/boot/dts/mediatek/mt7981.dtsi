@@ -352,6 +352,7 @@
 		clock-names = "top_eip97_ck";
 		assigned-clocks = <&topckgen CK_TOP_EIP97B_SEL>;
 		assigned-clock-parents = <&topckgen CK_TOP_CB_NET1_D5>;
+		status = "okay";
 	};
 
 	pio: pinctrl@11d00000 {
