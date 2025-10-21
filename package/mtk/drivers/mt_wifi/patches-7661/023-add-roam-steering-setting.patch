@@ -16,14 +16,14 @@
  		}
  
  		avgRssi = RTMPAvgRssi(pAd, &pEntry->RssiSample);
-+
++		
 +		if ( pEntry->RssiSample.Rssi_Updated && pMbss->SteeringThreshold &&
 +			(avgRssi < pMbss->SteeringThreshold)) {
-+
++			
 +			MTWF_DBG(pAd, DBG_CAT_AP, DBG_SUBCAT_ALL, DBG_LVL_NOTICE,
 +					 "Steering STA "MACSTR", RSSI SteeringThreshold Thres[%d]-[%d]\n",
 +					  MAC2STR(pEntry->Addr), pMbss->SteeringThreshold,	avgRssi);
-+
++					  
 +				if (WMODE_CAP_2G(pEntry->wdev->PhyMode)) {
 +				snprintf(argv[0], sizeof(path), "/sbin/steeringsta");
 +				snprintf(argv[1], sizeof(arg1), "ra0");
@@ -41,7 +41,7 @@
  					REASON_DEAUTH_STA_LEAVING);
  #endif
  		}
-+
++		
  
  		if (bDisconnectSta) {
  			/* send wireless event - for ageout */
@@ -55,14 +55,14 @@
  
  INT Set_BasicRate_Proc(RTMP_ADAPTER *pAd, RTMP_STRING *arg);
  
-@@ -1266,6 +1267,7 @@
+@@ -1251,6 +1252,7 @@
  #endif /* SPECIFIC_TX_POWER_SUPPORT */
  	{"AssocReqRssiThres",           Set_AP_ASSOC_REQ_RSSI_THRESHOLD},
  	{"KickStaRssiLow",				Set_AP_KickStaRssiLow_Proc},
 +	{"Steeringthresold",				Set_AP_SteeringThreshold_Proc},
- #ifdef ZERO_LOSS_CSA_SUPPORT
- 	{"KickOffSta",					Set_KickOffSta_Proc},
- 	{"KickOffTime",					Set_KickOffTime_Proc},
+ 	{"PtkRekey",					Set_PtkRekey_Proc},
+ #ifdef OCE_SUPPORT
+ 	{"OceRssiThreshold",			Set_OceRssiThreshold_Proc},
 @@ -14528,6 +14530,16 @@
  	TRUE if all parameters are OK, FALSE otherwise
      ==========================================================================
