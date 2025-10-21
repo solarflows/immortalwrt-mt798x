@@ -1072,6 +1072,7 @@ struct GNU_PACKED wapp_req {
 	wapp_req_data data;
 };
 
+
 typedef struct GNU_PACKED _tbtt_info_set {
 	u8 NrAPTbttOffset;
 	u32 ShortBssid;
@@ -1150,7 +1151,7 @@ typedef union GNU_PACKED _wapp_event_data {
 #ifdef WPS_UNCONFIG_FEATURE_SUPPORT
 	struct wapp_wps_config_info wps_conf_info;
 #endif
-        wapp_cac_info cac_info;
+	wapp_cac_info cac_info;
 #ifdef MAP_R2
 	wdev_extended_ap_metric ext_ap_metrics;
 	wdev_radio_metric radio_metrics;
@@ -1170,7 +1171,7 @@ typedef union GNU_PACKED _wapp_event_data {
 #endif
 #ifdef MAP_R3
 	struct wapp_sta_info sta_info;
-        struct wapp_uri_info uri_info;
+	struct wapp_uri_info uri_info;
 #endif /* MAP_R3 */
 #ifdef QOS_R1
 	u8 *qos_frm;
@@ -1188,17 +1189,6 @@ typedef union GNU_PACKED _wapp_event_data {
 	u8 eht_ch_change;
 #endif
 } wapp_event_data;
-
-struct GNU_PACKED _wapp_event2_data {
-	wapp_client_info cli_info;
-};
-
-struct GNU_PACKED wapp_event2 {
-	u8 len;
-	u8 event_id;
-	u32 ifindex;
-	struct _wapp_event2_data data;
-};
 
 struct GNU_PACKED wapp_event {
 	u8 len;
