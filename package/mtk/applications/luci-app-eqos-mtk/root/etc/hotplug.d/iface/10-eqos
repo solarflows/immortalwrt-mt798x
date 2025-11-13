@@ -3,6 +3,40 @@
 [ "$ACTION" = ifup -o "$ACTION" = ifupdate ] || exit 0
 [ "$ACTION" = ifupdate -a -z "$IFUPDATE_ADDRESSES" -a -z "$IFUPDATE_DATA" ] && exit 0
 
+# Dynamic match for LAN-related events:
+# 1) Match if logical interface is 'lan' or kernel device is 'br-lan'
+# 2) Match if device/interface appears in UCI `network.lan.ifname`
+# 3) Fallback: check bridge membership via `bridge` or `brctl` if available
+
+match=0
+if [ "$INTERFACE" = "lan" ] || [ "$DEVICE" = "br-lan" ]; then
+	match=1
+fi
+
+if [ $match -eq 0 ]; then
+	lan_if=$(uci -q get network.lan.ifname)
+	if [ -n "$lan_if" ]; then
+		for ifn in $lan_if; do
+			[ "$ifn" = "$DEVICE" ] || [ "$ifn" = "$INTERFACE" ] && match=1 && break
+		done
+	fi
+fi
+
+if [ $match -eq 0 ]; then
+	if command -v bridge >/dev/null 2>&1; then
+		# bridge link output lists interfaces; try to find DEVICE
+		bridge link show 2>/dev/null | grep -qw "$DEVICE" && match=1
+	elif command -v brctl >/dev/null 2>&1; then
+		# brctl show br-lan prints a table; check for DEVICE in the 4th column
+		brctl show br-lan 2>/dev/null | awk 'NR>1 {print $4}' | grep -qw "$DEVICE" && match=1
+	fi
+fi
+
+[ $match -eq 1 ] || exit 0
+
+# ensure eqos init script exists and is executable
+[ -x /etc/init.d/eqos ] || exit 0
+
 logger -t "eqos-hotplug" "Restart for $ACTION of $INTERFACE ($DEVICE)"
 
 /etc/init.d/eqos restart
