@@ -1072,7 +1072,6 @@ struct GNU_PACKED wapp_req {
 	wapp_req_data data;
 };
 
-
 typedef struct GNU_PACKED _tbtt_info_set {
 	u8 NrAPTbttOffset;
 	u32 ShortBssid;

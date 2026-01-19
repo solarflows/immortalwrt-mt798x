@@ -123,7 +123,7 @@ iptables_start_inital() {
 
 	# binging HQoS queues to default(disable rate limiting)
 	echo 0 0 0 0 0 0 4 > /sys/kernel/debug/hnat/qdma_txq0
-	echo 1 0 0 0 0 0 4 > /sys/kernel/debug/hnat/qdma_txq63
+	echo 1 0 0 0 0 0 4 > /sys/kernel/debug/hnat/qdma_txq32
 
 	# set hnat bind rate to 5pps to let more packets go through hqos
 	echo "11 5" >/sys/kernel/debug/hnat/hnat_setting
