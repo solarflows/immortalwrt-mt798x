@@ -364,6 +364,7 @@ dhcp_host_add() {
 	add_tag() {
 		mtags="${mtags}tag:$1,"
 	}
+
 	config_list_foreach "$cfg" match_tag add_tag
 
 	if [ -n "$mac" ]; then
@@ -946,8 +947,6 @@ dnsmasq_start()
 	append_bool "$cfg" filter_a "--filter-A"
 
 	append_parm "$cfg" logfacility "--log-facility"
-
-	append_parm "$cfg" mini_ttl "--min-ttl"
 
 	append_parm "$cfg" cachesize "--cache-size"
 	append_parm "$cfg" dnsforwardmax "--dns-forward-max"
