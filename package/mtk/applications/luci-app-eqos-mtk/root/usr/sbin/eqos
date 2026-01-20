@@ -65,9 +65,9 @@ iptables_stop() {
 	# echo "10 0" > /sys/kernel/debug/hnat/hnat_setting
 
 	# restore hnat band rate
-	echo "11 30" >/sys/kernel/debug/hnat/hnat_setting
-	uci -q set "turboacc.config.fastpath_mh_eth_hnat_bind_rate"="30"
-	uci -q commit "turboacc"
+	# echo "11 30" >/sys/kernel/debug/hnat/hnat_setting
+	# uci -q set "turboacc.config.fastpath_mh_eth_hnat_bind_rate"="30"
+	# uci -q commit "turboacc"
 
 	# Reset HQoS queue parameters
 	## downlink queues
