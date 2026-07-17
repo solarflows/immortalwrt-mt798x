@@ -14,7 +14,7 @@
 		led-boot = &boot_led;
 		led-failsafe = &boot_led;
 		led-running = &running_led;
-		led-upgrade = &running_led;
+		led-upgrade = &upgrading_led;
 	};
 
 	chosen {
@@ -44,7 +44,7 @@
 	gpio-leds {
 		compatible = "gpio-leds";
 
-		led-0 {
+		upgrading_led: led-0 {
 			label = "blue:status";
 			gpios = <&pio 9 GPIO_ACTIVE_LOW>;
 		};
