@@ -48,7 +48,7 @@ endif
 PATCH_DIR=../patches/$(GCC_VERSION)
 
 BUGURL=http://bugs.openwrt.org/
-PKGVERSION=OpenWrt GCC $(PKG_VERSION) $(REVISION)
+PKGVERSION=OpenWrt GCC $(PKG_VERSION) toolchain-$(TOOLCHAIN_HASH)
 
 HOST_BUILD_PARALLEL:=1
 
